@@ -204,6 +204,19 @@ export default function TokensPage() {
     setStatusMessage("Criando cobrança Pix...");
     setSelectedPlanId(planId);
 
+    // Verificar se o usuário está autenticado
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      setStatus("error");
+      setStatusMessage("");
+      setError("Sessão expirada. Por favor, faça login novamente.");
+      setTimeout(() => router.replace("/auth"), 2000);
+      return;
+    }
+
     const { data, error: invokeError } = await supabase.functions.invoke("create_token_purchase", {
       body: { planId },
     });
