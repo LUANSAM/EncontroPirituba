@@ -82,6 +82,7 @@ export default function TokensPage() {
   const [role, setRole] = useState<UserRole | null>(null);
   const [isBootLoading, setIsBootLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isPixPopupOpen, setIsPixPopupOpen] = useState(false);
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [purchaseId, setPurchaseId] = useState("");
@@ -147,8 +148,21 @@ export default function TokensPage() {
     let cancelled = false;
 
     const poll = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        setStatus("error");
+        setStatusMessage("Sessão expirada durante a verificação do pagamento. Faça login novamente.");
+        return;
+      }
+
       const { data, error: invokeError } = await supabase.functions.invoke("check_token_purchase_status", {
         body: { purchaseId },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (cancelled) return;
@@ -209,7 +223,7 @@ export default function TokensPage() {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session) {
+    if (!session?.access_token) {
       setStatus("error");
       setStatusMessage("");
       setError("Sessão expirada. Por favor, faça login novamente.");
@@ -219,12 +233,24 @@ export default function TokensPage() {
 
     const { data, error: invokeError } = await supabase.functions.invoke("create_token_purchase", {
       body: { planId },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
     });
 
     if (invokeError) {
       setStatus("error");
       setStatusMessage("");
-      setError("Não foi possível iniciar a cobrança Pix agora. Tente novamente.");
+      const backendError = String((data as { error?: unknown } | null)?.error || "");
+      const backendReason = String((data as { reason?: unknown } | null)?.reason || "");
+
+      if (backendReason === "mercado_pago_test_mode") {
+        setError("Token do Mercado Pago está em modo TESTE. Configure um token APP_USR (produção) para gerar Pix pagável no banco.");
+      } else if (backendError) {
+        setError(backendError);
+      } else {
+        setError("Não foi possível iniciar a cobrança Pix agora. Tente novamente.");
+      }
       return;
     }
 
@@ -241,10 +267,11 @@ export default function TokensPage() {
 
     setPurchaseId(nextPurchaseId);
     setPixQrCodeBase64(qrCodeBase64);
-    setPixQrCodeText(qrCode);
+    setPixQrCodeText(qrCode.trim());
     setPixTicketUrl(String(data?.ticketUrl || ""));
     setStatus("pending");
     setStatusMessage("Pagamento Pix criado. Não atualize esta tela até a confirmação.");
+    setIsPixPopupOpen(true);
   };
 
   const copyPixCode = async () => {
@@ -277,6 +304,18 @@ export default function TokensPage() {
               <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-sm font-semibold text-amber-800">
                 Não atualize esta tela após iniciar o pagamento. A confirmação roda em segundo plano e o saldo será atualizado automaticamente.
               </p>
+
+              {status === "pending" && (pixQrCodeBase64 || pixQrCodeText) && (
+                <div className="mt-2 flex justify-end">
+                  <button
+                    className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900"
+                    onClick={() => setIsPixPopupOpen(true)}
+                    type="button"
+                  >
+                    Abrir pagamento Pix
+                  </button>
+                </div>
+              )}
 
               <div className="mt-3 grid gap-3 min-[750px]:grid-cols-2">
                 {PLANS.map((plan) => {
@@ -334,6 +373,47 @@ export default function TokensPage() {
           )}
         </section>
       </div>
+
+      {isPixPopupOpen && (pixQrCodeBase64 || pixQrCodeText) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-3" onClick={() => setIsPixPopupOpen(false)}>
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-bold text-blue-900">Pagamento via Pix</h3>
+              <button className="rounded border px-2 py-1 text-xs font-semibold text-gray-700" onClick={() => setIsPixPopupOpen(false)} type="button">
+                Fechar
+              </button>
+            </div>
+
+            <p className="mt-1 text-xs text-graytext">Escaneie o QR Code ou use o código copia e cola abaixo.</p>
+
+            <div className="mt-3 rounded-lg border bg-gray-50 p-3">
+              {pixQrCodeBase64 ? (
+                <img alt="QR Code Pix" className="mx-auto h-52 w-52 object-contain" src={`data:image/png;base64,${pixQrCodeBase64}`} />
+              ) : (
+                <p className="text-xs text-graytext">QR Code indisponível. Use o código copia e cola.</p>
+              )}
+            </div>
+
+            <div className="mt-3 rounded-lg border bg-white p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Código Pix (copia e cola)</p>
+              <textarea className="mt-2 h-24 w-full rounded-lg border px-2 py-1 text-xs" readOnly value={pixQrCodeText} />
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button className="rounded-lg bg-blue-900 px-3 py-1.5 text-xs font-semibold text-white" onClick={copyPixCode} type="button">
+                  Copiar código
+                </button>
+                {pixTicketUrl && (
+                  <a className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-900" href={pixTicketUrl} rel="noreferrer" target="_blank">
+                    Abrir no Mercado Pago
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {statusMessage && <p className="mt-3 text-xs text-graytext">{statusMessage}</p>}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

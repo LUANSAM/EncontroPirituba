@@ -8,40 +8,120 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function parseJwtClaims(token: string): { sub: string | null; email: string | null; exp: number | null } {
+  try {
+    const tokenParts = token.split(".");
+    if (tokenParts.length < 2) return { sub: null, email: null, exp: null };
+
+    const payloadBase64 = tokenParts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = payloadBase64.padEnd(Math.ceil(payloadBase64.length / 4) * 4, "=");
+    const payloadJson = atob(paddedPayload);
+    const payload = JSON.parse(payloadJson) as { sub?: string; email?: string; exp?: number };
+
+    return {
+      sub: typeof payload.sub === "string" ? payload.sub : null,
+      email: typeof payload.email === "string" ? payload.email : null,
+      exp: typeof payload.exp === "number" ? payload.exp : null,
+    };
+  } catch {
+    return { sub: null, email: null, exp: null };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const traceId = crypto.randomUUID().slice(0, 8);
+  const log = (step: string, payload?: Record<string, unknown>) => {
+    console.log(`[check_token_purchase_status][${traceId}] ${step}`, payload ?? {});
+  };
+
   try {
+    log("request_received", {
+      method: req.method,
+      url: req.url,
+      hasAuthorizationHeader: Boolean(req.headers.get("authorization") ?? req.headers.get("Authorization")),
+      hasApikeyHeader: Boolean(req.headers.get("apikey")),
+      clientInfo: req.headers.get("x-client-info") ?? null,
+    });
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const mercadoPagoAccessToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN") ?? "";
 
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey || !mercadoPagoAccessToken) {
+    log("env_check", {
+      hasSupabaseUrl: Boolean(supabaseUrl),
+      hasServiceRoleKey: Boolean(supabaseServiceRoleKey),
+      hasMercadoPagoToken: Boolean(mercadoPagoAccessToken),
+    });
+
+    if (!supabaseUrl || !supabaseServiceRoleKey || !mercadoPagoAccessToken) {
+      log("missing_env_configuration");
       return Response.json({ error: "Missing payment environment configuration." }, { status: 500, headers: corsHeaders });
     }
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return Response.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+    const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
+    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    log("auth_header_parsed", {
+      authHeaderPresent: Boolean(authHeader),
+      tokenLength: accessToken.length,
+      tokenPrefix: accessToken ? accessToken.slice(0, 12) : null,
+    });
+
+    if (!accessToken) {
+      log("unauthorized_missing_token");
+      return Response.json({ error: "Unauthorized", reason: "missing_authorization_header" }, { status: 401, headers: corsHeaders });
     }
 
-    const authedClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
     const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const {
       data: { user },
       error: authError,
-    } = await authedClient.auth.getUser();
+    } = await serviceClient.auth.getUser(accessToken);
 
-    if (authError || !user?.id) {
-      return Response.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+    const claims = parseJwtClaims(accessToken);
+    const claimSub = claims.sub;
+    const claimEmail = claims.email;
+    const claimExp = claims.exp;
+    const isClaimExpired = typeof claimExp === "number" && claimExp * 1000 < Date.now();
+
+    log("auth_get_user_result", {
+      authError: authError?.message ?? null,
+      userId: user?.id ?? null,
+      userEmail: user?.email ?? null,
+      claimSub,
+      claimEmail,
+      claimExp,
+      isClaimExpired,
+    });
+
+    const authUserId = user?.id ?? claimSub;
+
+    if (!authUserId || isClaimExpired) {
+      log("unauthorized_invalid_token", {
+        authError: authError?.message ?? null,
+        hasUser: Boolean(user),
+        hasClaimSub: Boolean(claimSub),
+        isClaimExpired,
+      });
+      return Response.json(
+        {
+          error: "Unauthorized",
+          reason: "invalid_or_expired_token",
+          details: authError?.message ?? null,
+        },
+        { status: 401, headers: corsHeaders },
+      );
     }
 
     const body = await req.json();
     const purchaseId = String(body?.purchaseId || "");
+
+    log("purchase_id_validation", {
+      purchaseId,
+      hasPurchaseId: Boolean(purchaseId),
+    });
 
     if (!purchaseId) {
       return Response.json({ error: "Missing purchase id." }, { status: 400, headers: corsHeaders });
@@ -52,6 +132,11 @@ Deno.serve(async (req) => {
       .select("id, user_id, usuario_id, status, tokens_amount, tokens_credited, mp_payment_id, pix_expires_at, approved_at")
       .eq("id", purchaseId)
       .limit(1);
+
+    log("purchase_lookup", {
+      purchaseError: purchaseError?.message ?? null,
+      purchaseCount: purchaseRows?.length ?? 0,
+    });
 
     if (purchaseError || !purchaseRows || purchaseRows.length === 0) {
       return Response.json({ error: "Purchase not found." }, { status: 404, headers: corsHeaders });
@@ -69,7 +154,11 @@ Deno.serve(async (req) => {
       approved_at?: string;
     };
 
-    if (purchase.user_id !== user.id) {
+    if (purchase.user_id !== authUserId) {
+      log("forbidden_purchase_owner_mismatch", {
+        purchaseUserId: purchase.user_id,
+        authUserId,
+      });
       return Response.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
     }
 
@@ -103,7 +192,15 @@ Deno.serve(async (req) => {
 
     const mpData = await mpResponse.json();
 
+    log("mercado_pago_status_response", {
+      ok: mpResponse.ok,
+      status: mpResponse.status,
+      mpStatus: mpData?.status ?? null,
+      mpStatusDetail: mpData?.status_detail ?? null,
+    });
+
     if (!mpResponse.ok) {
+      log("mercado_pago_status_failed", { status: mpResponse.status });
       return Response.json({ error: "Could not fetch payment status from Mercado Pago.", details: mpData }, { status: 400, headers: corsHeaders });
     }
 
@@ -230,6 +327,7 @@ Deno.serve(async (req) => {
       })
       .eq("id", purchaseId);
 
+    log("request_success_pending", { purchaseId });
     return Response.json(
       {
         status: "pending",
@@ -238,6 +336,10 @@ Deno.serve(async (req) => {
       { headers: corsHeaders },
     );
   } catch (error) {
+    console.error(`[check_token_purchase_status][${traceId}] unhandled_error`, {
+      message: (error as Error).message,
+      stack: (error as Error).stack ?? null,
+    });
     return Response.json({ error: (error as Error).message }, { status: 400, headers: corsHeaders });
   }
 });
