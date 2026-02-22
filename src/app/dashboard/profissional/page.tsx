@@ -9,6 +9,7 @@ type IndicadoresMap = Record<string, unknown>;
 
 interface DashboardData {
   nome: string;
+  categorias: string[];
   indicadores: IndicadoresMap;
   avaliacao: number;
   preco: number;
@@ -228,7 +229,7 @@ export default function DashboardProfissionalPage() {
 
       const { data, error: queryError } = await supabase
         .from("usuarios")
-        .select("nome, indicadores, avaliacao, preco, tokens, contato, endereco, descricao, fotos, panfleto, beneficios, meios_pagamento")
+        .select("nome, categorias, indicadores, avaliacao, preco, tokens, contato, endereco, descricao, fotos, panfleto, beneficios, meios_pagamento")
         .eq("email", user.email)
         .eq("role", "profissional")
         .order("created_at", { ascending: false })
@@ -245,6 +246,7 @@ export default function DashboardProfissionalPage() {
       const row = data[0] as Record<string, unknown>;
       setDashboardData({
         nome: (row.nome as string) || "Profissional",
+        categorias: toStringArray(row.categorias).slice(0, 3),
         indicadores: (row.indicadores as IndicadoresMap) || {},
         avaliacao: toNumber(row.avaliacao, 0),
         preco: toNumber(row.preco, 0),
@@ -392,8 +394,15 @@ export default function DashboardProfissionalPage() {
         )}
 
         {!previewMode && dashboardData && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-2">
             <TokensIndicator tokens={dashboardData.tokens} />
+            <button
+              className="rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
+              onClick={() => router.push("/tokens")}
+              type="button"
+            >
+              Comprar tokens via Pix
+            </button>
           </div>
         )}
 
@@ -462,6 +471,19 @@ export default function DashboardProfissionalPage() {
                 </div>
 
                 {dashboardData.descricao && <p className="mt-3 text-sm leading-relaxed text-graytext">{dashboardData.descricao}</p>}
+
+                {dashboardData.categorias.length > 0 && (
+                  <div className="mt-3 rounded-lg border bg-blue-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-900">Categorias de atuação</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {dashboardData.categorias.map((categoria) => (
+                        <span key={categoria} className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-900">
+                          {categoria}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <article className="rounded-lg border bg-blue-50 p-3">
@@ -654,32 +676,32 @@ export default function DashboardProfissionalPage() {
                   </article>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="flex items-center gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-[clamp(0.35rem,1.2vw,0.5rem)]">
+                  <div className="flex items-center gap-[clamp(0.35rem,1.2vw,0.5rem)]">
                     <img
                       alt="Ícone de avaliações"
-                      className="h-[150px] w-[150px] rounded-md object-contain"
+                      className="h-[clamp(88px,24vw,150px)] w-[clamp(88px,24vw,150px)] rounded-md object-contain"
                       src="/images/objetivos/avaliacoes.jpg"
                     />
                     <div className="min-w-0">
-                      <p className="text-[clamp(0.78rem,2.2vw,0.95rem)] font-bold text-blue-900">Avaliações</p>
+                      <p className="text-[clamp(0.7rem,2vw,0.95rem)] font-bold text-blue-900">Avaliações</p>
                       <AnimatedDescendingNumber
-                        className="whitespace-nowrap font-mono text-[clamp(1rem,4vw,1.7rem)] font-bold leading-tight text-blue-900"
+                        className="whitespace-nowrap font-mono text-[clamp(0.95rem,4.2vw,1.7rem)] font-bold leading-tight text-blue-900"
                         value={Math.max(0, Math.round(mainIndicators.nAvaliacao || 0))}
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-[clamp(0.35rem,1.2vw,0.5rem)]">
                     <img
                       alt="Ícone de atendimentos"
-                      className="h-[150px] w-[150px] rounded-md object-contain"
+                      className="h-[clamp(88px,24vw,150px)] w-[clamp(88px,24vw,150px)] rounded-md object-contain"
                       src="/images/objetivos/atendimentos.jpg"
                     />
                     <div className="min-w-0">
-                      <p className="text-[clamp(0.78rem,2.2vw,0.95rem)] font-bold text-blue-900">Atendimentos</p>
+                      <p className="text-[clamp(0.7rem,2vw,0.95rem)] font-bold text-blue-900">Atendimentos</p>
                       <AnimatedDescendingNumber
-                        className="whitespace-nowrap font-mono text-[clamp(1rem,4vw,1.7rem)] font-bold leading-tight text-blue-900"
+                        className="whitespace-nowrap font-mono text-[clamp(0.95rem,4.2vw,1.7rem)] font-bold leading-tight text-blue-900"
                         value={Math.max(0, Math.round(mainIndicators.atendimentos || 0))}
                       />
                     </div>

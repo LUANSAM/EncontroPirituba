@@ -23,6 +23,7 @@ const BENEFIT_OPTIONS = [
   "Íntimo",
   "Aceita convênio médico",
 ] as const;
+const MAX_SELECTED_CATEGORIES = 3;
 
 type PublicRole = "cliente" | "profissional" | "estabelecimento";
 
@@ -73,6 +74,9 @@ export default function ConfiguracoesIniciaisPage() {
   const [catalog, setCatalog] = useState<File | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [benefits, setBenefits] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [categoryWarning, setCategoryWarning] = useState("");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -88,6 +92,49 @@ export default function ConfiguracoesIniciaisPage() {
       previews.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
     };
   }, [photos]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const { data, error: activeBooleanError } = await supabase
+        .from("categorias")
+        .select("categoria")
+        .eq("ativo", true)
+        .order("categoria", { ascending: true });
+
+      if (!mounted) return;
+
+      if (!activeBooleanError && data) {
+        const categories = data
+          .map((row) => String((row as { categoria?: unknown }).categoria || "").trim())
+          .filter(Boolean);
+        setAvailableCategories(categories);
+        return;
+      }
+
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("categorias")
+        .select("categoria")
+        .eq("ativo", "true")
+        .order("categoria", { ascending: true });
+
+      if (!mounted) return;
+      if (fallbackError || !fallbackData) {
+        setAvailableCategories([]);
+        return;
+      }
+
+      const categories = fallbackData
+        .map((row) => String((row as { categoria?: unknown }).categoria || "").trim())
+        .filter(Boolean);
+      setAvailableCategories(categories);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handlePhotosChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(event.target.files || []);
@@ -122,6 +169,22 @@ export default function ConfiguracoesIniciaisPage() {
       return;
     }
     onChange([...currentValues, value]);
+  };
+
+  const toggleCategory = (value: string) => {
+    if (selectedCategories.includes(value)) {
+      setSelectedCategories((prev) => prev.filter((item) => item !== value));
+      setCategoryWarning("");
+      return;
+    }
+
+    if (selectedCategories.length >= MAX_SELECTED_CATEGORIES) {
+      setCategoryWarning("Você pode selecionar no máximo 3 categorias.");
+      return;
+    }
+
+    setSelectedCategories((prev) => [...prev, value]);
+    setCategoryWarning("");
   };
 
   const uploadPhotoFiles = async (bucket: string, userId: string) => {
@@ -177,7 +240,7 @@ export default function ConfiguracoesIniciaisPage() {
 
       const { data: usuariosData, error: usuariosError } = await supabase
         .from("usuarios")
-        .select("id, role")
+        .select("id, role, categorias")
         .eq("email", authUser.email)
         .order("created_at", { ascending: false })
         .limit(1);
@@ -190,6 +253,12 @@ export default function ConfiguracoesIniciaisPage() {
 
       const usuario = usuariosData[0] as { id: string; role: PublicRole };
       const role = usuario.role;
+
+      if (selectedCategories.length === 0) {
+        setError("Selecione ao menos uma categoria de atuação para continuar.");
+        setIsLoading(false);
+        return;
+      }
 
       if (role !== "profissional" && role !== "estabelecimento") {
         router.push(getDashboardPathByRole(role));
@@ -205,6 +274,7 @@ export default function ConfiguracoesIniciaisPage() {
         panfleto: catalogUrl || null,
         meios_pagamento: paymentMethods,
         beneficios: benefits,
+        categorias: selectedCategories,
         descricao: description.trim(),
       };
 
@@ -265,6 +335,33 @@ export default function ConfiguracoesIniciaisPage() {
             <div>
               <label className="mb-2 block text-sm font-semibold text-blue-900">Folder/Catálogo em PDF (opcional)</label>
               <input accept="application/pdf" className="w-full rounded-lg border px-3 py-2" onChange={handleCatalogChange} type="file" />
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-blue-900">Categorias de atuação</p>
+              <p className="mb-2 text-xs text-graytext">Selecionadas {selectedCategories.length}/{MAX_SELECTED_CATEGORIES}</p>
+              {availableCategories.length === 0 ? (
+                <p className="text-sm text-graytext">Nenhuma categoria ativa encontrada no momento.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 min-[401px]:grid-cols-2 min-[551px]:grid-cols-3">
+                  {availableCategories.map((option) => {
+                    const selected = selectedCategories.includes(option);
+                    const isLimitReached = selectedCategories.length >= MAX_SELECTED_CATEGORIES && !selected;
+                    return (
+                      <button
+                        aria-disabled={isLimitReached}
+                        key={option}
+                        className={`rounded-lg border px-3 py-2 text-left text-[clamp(0.72rem,1.7vw,0.9rem)] leading-tight ${selected ? "border-blue-900 bg-blue-50 text-blue-900" : "border-gray-200 text-gray-700"} ${isLimitReached ? "cursor-not-allowed opacity-60" : ""}`}
+                        onClick={() => toggleCategory(option)}
+                        type="button"
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {categoryWarning && <p className="mt-2 text-xs text-red-700">{categoryWarning}</p>}
             </div>
 
             <div>

@@ -23,6 +23,7 @@ const BENEFIT_OPTIONS = [
   "Íntimo",
   "Aceita convênio médico",
 ] as const;
+const MAX_SELECTED_CATEGORIES = 3;
 
 type Role = "profissional" | "estabelecimento";
 
@@ -83,6 +84,9 @@ export function BusinessProfileEditorPage({ role }: Props) {
   });
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [benefits, setBenefits] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [categoryWarning, setCategoryWarning] = useState("");
   const [description, setDescription] = useState("");
 
   const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
@@ -108,6 +112,49 @@ export function BusinessProfileEditorPage({ role }: Props) {
     let mounted = true;
 
     (async () => {
+      const { data, error: activeBooleanError } = await supabase
+        .from("categorias")
+        .select("categoria")
+        .eq("ativo", true)
+        .order("categoria", { ascending: true });
+
+      if (!mounted) return;
+
+      if (!activeBooleanError && data) {
+        const categories = data
+          .map((row) => String((row as { categoria?: unknown }).categoria || "").trim())
+          .filter(Boolean);
+        setAvailableCategories(categories);
+        return;
+      }
+
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("categorias")
+        .select("categoria")
+        .eq("ativo", "true")
+        .order("categoria", { ascending: true });
+
+      if (!mounted) return;
+      if (fallbackError || !fallbackData) {
+        setAvailableCategories([]);
+        return;
+      }
+
+      const categories = fallbackData
+        .map((row) => String((row as { categoria?: unknown }).categoria || "").trim())
+        .filter(Boolean);
+      setAvailableCategories(categories);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -123,7 +170,7 @@ export function BusinessProfileEditorPage({ role }: Props) {
 
       const { data, error: loadError } = await supabase
         .from("usuarios")
-        .select("id, nome, email, role, endereco, contato, meios_pagamento, fotos, panfleto, beneficios, descricao")
+        .select("id, nome, email, role, endereco, contato, meios_pagamento, fotos, panfleto, beneficios, descricao, categorias")
         .eq("email", user.email)
         .eq("role", role)
         .order("created_at", { ascending: false })
@@ -160,6 +207,7 @@ export function BusinessProfileEditorPage({ role }: Props) {
       });
       setPaymentMethods(Array.isArray(row.meios_pagamento) ? row.meios_pagamento : []);
       setBenefits(Array.isArray(row.beneficios) ? row.beneficios : []);
+      setSelectedCategories(Array.isArray(row.categorias) ? row.categorias.filter((item: unknown) => typeof item === "string") : []);
       setDescription((row.descricao || "").toString().slice(0, 500));
       setExistingPhotos(Array.isArray(row.fotos) ? row.fotos.filter((url: string) => Boolean(url)) : []);
       setExistingPanfleto((row.panfleto || "").toString());
@@ -177,6 +225,22 @@ export function BusinessProfileEditorPage({ role }: Props) {
       return;
     }
     onChange([...currentValues, value]);
+  };
+
+  const toggleCategory = (value: string) => {
+    if (selectedCategories.includes(value)) {
+      setSelectedCategories((prev) => prev.filter((item) => item !== value));
+      setCategoryWarning("");
+      return;
+    }
+
+    if (selectedCategories.length >= MAX_SELECTED_CATEGORIES) {
+      setCategoryWarning("Você pode selecionar no máximo 3 categorias.");
+      return;
+    }
+
+    setSelectedCategories((prev) => [...prev, value]);
+    setCategoryWarning("");
   };
 
   const handleNewPhotosChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -262,6 +326,7 @@ export function BusinessProfileEditorPage({ role }: Props) {
         nome: name,
         endereco,
         contato,
+        categorias: selectedCategories,
         meios_pagamento: paymentMethods,
         beneficios: benefits,
         descricao: description.trim(),
@@ -394,6 +459,33 @@ export function BusinessProfileEditorPage({ role }: Props) {
                   value={contato.site}
                 />
               </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-blue-900">Categorias de atuação</p>
+              <p className="mb-2 text-xs text-graytext">Selecionadas {selectedCategories.length}/{MAX_SELECTED_CATEGORIES}</p>
+              {availableCategories.length === 0 ? (
+                <p className="text-sm text-graytext">Nenhuma categoria ativa encontrada no momento.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 min-[401px]:grid-cols-2 min-[551px]:grid-cols-3">
+                  {availableCategories.map((option) => {
+                    const selected = selectedCategories.includes(option);
+                    const isLimitReached = selectedCategories.length >= MAX_SELECTED_CATEGORIES && !selected;
+                    return (
+                      <button
+                        aria-disabled={isLimitReached}
+                        key={option}
+                        className={`rounded-lg border px-3 py-2 text-left text-[clamp(0.72rem,1.7vw,0.9rem)] leading-tight ${selected ? "border-blue-900 bg-blue-50 text-blue-900" : "border-gray-200 text-gray-700"} ${isLimitReached ? "cursor-not-allowed opacity-60" : ""}`}
+                        onClick={() => toggleCategory(option)}
+                        type="button"
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {categoryWarning && <p className="mt-2 text-xs text-red-700">{categoryWarning}</p>}
             </div>
 
             <div>
