@@ -1,0 +1,78 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CategoryChips snapshot 1`] = `
+<div
+  class="flex flex-wrap justify-center gap-2"
+>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Beleza
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Saúde
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Casa
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Educação
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Alimentação
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Pet
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Carro
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Eventos
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Lazer
+  </button>
+  <button
+    class="rounded-full border border-blue-500 px-3 py-1 text-sm font-medium text-blue-900"
+    style="-webkit-tap-highlight-color: transparent;"
+    type="button"
+  >
+    Esportes
+  </button>
+</div>
+`;

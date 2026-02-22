@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`HeroCarousel snapshot 1`] = `
+<article
+  class="rounded-lg bg-white p-2 shadow sm:p-3 md:p-4 overflow-hidden bg-blue-900 p-0 text-white"
+>
+  <div
+    class="px-4 pb-2 pt-2 text-center md:px-6 md:pb-4"
+  >
+    <div
+      class="relative mx-auto h-56 w-full overflow-hidden rounded-xl border border-white/20 bg-white/10 md:h-80"
+    >
+      <div
+        class="absolute inset-0 flex animate-pulse items-center justify-center bg-blue-500/30"
+      >
+        <span
+          class="text-sm font-medium text-white/90"
+        >
+          Adicione imagens em public/images/banners
+        </span>
+      </div>
+      <div
+        class="absolute inset-x-0 bottom-0 flex flex-col items-center justify-center space-y-1 bg-gradient-to-t from-white/95 to-transparent p-4 pb-6 text-center"
+      >
+        <span
+          class="inline-flex animate-pulse rounded-full border border-black/30 bg-black/10 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-black"
+        >
+          Pirituba e região
+        </span>
+        <h1
+          class="text-lg font-semibold leading-tight text-black md:text-2xl"
+        >
+          Encontre serviços e ofertas na sua rua
+        </h1>
+        <p
+          class="mx-auto hidden max-w-2xl text-xs text-black/80 md:block md:text-sm"
+        >
+          Marketplace local para Pirituba e região, com foco em descoberta rápida e confiança.
+        </p>
+      </div>
+    </div>
+    <div
+      class="mt-2 flex justify-center gap-2"
+    >
+      <span
+        class="h-2 w-2 rounded-full bg-white"
+      />
+    </div>
+  </div>
+</article>
+`;

@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ListingCard snapshot 1`] = `
+<article
+  class="rounded-lg bg-white p-2 shadow sm:p-3 md:p-4 gap-2 sm:gap-3 md:gap-4 flex flex-col"
+>
+  <div
+    class="h-16 rounded-lg bg-blue-100 sm:h-20 md:h-24 md:w-32"
+  />
+  <div
+    class="flex-1"
+  >
+    <h3
+      class="text-sm font-bold text-blue-900 sm:text-base"
+    >
+      Teste
+    </h3>
+    <p
+      class="text-xs sm:text-sm"
+    >
+      Sub
+    </p>
+  </div>
+  <button
+    class="rounded-lg bg-blue-900 px-3 py-1.5 text-xs text-white sm:px-4 sm:py-2 sm:text-sm"
+  >
+    Ver detalhes
+  </button>
+</article>
+`;

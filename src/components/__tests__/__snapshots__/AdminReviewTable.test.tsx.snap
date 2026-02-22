@@ -1,0 +1,114 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AdminReviewTable snapshot 1`] = `
+<div
+  class="overflow-x-auto rounded-lg bg-white p-4 shadow"
+>
+  <table
+    class="w-full text-left"
+  >
+    <thead>
+      <tr
+        class="border-b"
+      >
+        <th
+          class="py-2"
+        >
+          Tipo
+        </th>
+        <th
+          class="py-2"
+        >
+          Nome
+        </th>
+        <th
+          class="py-2"
+        >
+          Status
+        </th>
+        <th
+          class="py-2"
+        >
+          Ações
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr
+        class="border-b"
+      >
+        <td
+          class="py-2"
+        >
+          Profissional
+        </td>
+        <td
+          class="py-2"
+        >
+          João Silva
+        </td>
+        <td
+          class="py-2"
+        >
+          pendente
+        </td>
+        <td
+          class="py-2"
+        >
+          <div
+            class="flex gap-2"
+          >
+            <button
+              class="rounded bg-blue-900 px-3 py-1 text-white"
+            >
+              Aprovar
+            </button>
+            <button
+              class="rounded border px-3 py-1"
+            >
+              Rejeitar
+            </button>
+          </div>
+        </td>
+      </tr>
+      <tr
+        class="border-b"
+      >
+        <td
+          class="py-2"
+        >
+          Estabelecimento
+        </td>
+        <td
+          class="py-2"
+        >
+          Barbearia Pirituba
+        </td>
+        <td
+          class="py-2"
+        >
+          em análise
+        </td>
+        <td
+          class="py-2"
+        >
+          <div
+            class="flex gap-2"
+          >
+            <button
+              class="rounded bg-blue-900 px-3 py-1 text-white"
+            >
+              Aprovar
+            </button>
+            <button
+              class="rounded border px-3 py-1"
+            >
+              Rejeitar
+            </button>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+`;

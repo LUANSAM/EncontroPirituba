@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AuthForm snapshot 1`] = `
+<form
+  class="space-y-3 rounded-lg bg-white p-4 shadow"
+>
+  <input
+    class="w-full rounded-lg border px-3 py-2"
+    name="email"
+    placeholder="Email"
+  />
+  <input
+    class="w-full rounded-lg border px-3 py-2"
+    name="password"
+    placeholder="Senha"
+    type="password"
+  />
+  <button
+    class="w-full rounded-lg bg-blue-900 px-4 py-2 text-white"
+    type="submit"
+  >
+    Entrar
+  </button>
+</form>
+`;

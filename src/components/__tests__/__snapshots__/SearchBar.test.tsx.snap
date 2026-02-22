@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SearchBar snapshot 1`] = `
+<article
+  class="rounded-lg bg-white p-2 shadow sm:p-3 md:p-4"
+>
+  <form
+    class="grid grid-cols-1 gap-3 md:grid-cols-4"
+  >
+    <input
+      class="rounded-lg border px-3 py-2 md:col-span-2"
+      name="term"
+      placeholder="Serviço ou categoria"
+    />
+    <input
+      class="rounded-lg border px-3 py-2"
+      name="location"
+      placeholder="Localização"
+    />
+    <button
+      class="rounded-lg bg-blue-500 px-4 py-2 font-semibold text-white hover:bg-accent"
+      type="submit"
+    >
+      Buscar
+    </button>
+  </form>
+</article>
+`;

@@ -1,0 +1,7 @@
+- Projeto: marketplace local Encontro Pirituba (React + TypeScript com Next.js App Router).
+- UI: Tailwind com tema azul (#1E7BF6, #0B3D91, #0A84FF, branco e cinza #4B5563).
+- Arquitetura: componentes atômicos em src/components (atoms, molecules, organisms, pages).
+- Backend: Supabase (Auth, Postgres, Storage, Edge Functions) e RLS obrigatório.
+- Regra de negócio principal: aprovação de profissionais/estabelecimentos apenas com CEP na allowlist (allowed_ceps).
+- Usar hooks customizados (useAuth, useProfile, useSearch, useBookings) e React Query.
+- Sempre manter foco em UX clara para mensagens de recusa de CEP e contato/espera.
