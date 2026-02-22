@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Container } from "@/components/atoms/Container";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,7 +11,9 @@ import { supabase } from "@/lib/supabase/client";
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const { data: session, isLoading } = useAuth();
 
@@ -20,6 +22,47 @@ export function Navbar() {
     session?.user?.user_metadata?.name || session?.user?.user_metadata?.full_name || session?.user?.user_metadata?.first_name;
   const emailName = session?.user?.email?.split("@")[0];
   const displayName = (metadataName || emailName || "Cliente").toString();
+  const isRegistrationPage = pathname === "/auth" || pathname.startsWith("/onboarding");
+  const shouldShowAuthButton = isAuthenticated || !isRegistrationPage;
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (!session?.user?.email) {
+      setUserRole(null);
+      return;
+    }
+
+    (async () => {
+      const { data } = await supabase
+        .from("usuarios")
+        .select("role")
+        .eq("email", session.user.email)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (!mounted) return;
+      setUserRole(data?.[0]?.role || null);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [session?.user?.email]);
+
+  const dashboardHref =
+    userRole === "profissional"
+      ? "/dashboard/profissional"
+      : userRole === "estabelecimento"
+        ? "/dashboard/estabelecimento"
+        : "/dashboard/cliente";
+
+  const profileHref =
+    userRole === "profissional"
+      ? "/dashboard/profissional/perfil"
+      : userRole === "estabelecimento"
+        ? "/dashboard/estabelecimento/perfil"
+        : "/dashboard/cliente";
 
   const handleAuthAction = async () => {
     if (isAuthenticated) {
@@ -52,28 +95,36 @@ export function Navbar() {
 
           <div className="ml-auto flex items-center gap-2">
             {isAuthenticated && (
-              <Link className="rounded-lg bg-blue-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent" href="/dashboard">
+              <Link className="rounded-lg bg-blue-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent" href={profileHref}>
                 Perfil
               </Link>
             )}
-            <button
-              className={`inline-flex items-center gap-1 font-semibold ${isAuthenticated ? "text-sm text-red-600 hover:text-red-700" : "text-base text-green-700 hover:text-green-600"}`}
-              disabled={isLoading}
-              onClick={handleAuthAction}
-              type="button"
-            >
-              {isAuthenticated ? (
-                <>
-                  <span>↩</span>
-                  <span>Sair</span>
-                </>
-              ) : (
-                <>
-                  <span>Entrar</span>
-                  <span>→</span>
-                </>
-              )}
-            </button>
+            {shouldShowAuthButton && (
+              <button
+                className={`inline-flex items-center gap-1 font-semibold ${isAuthenticated ? "text-sm text-red-600 hover:text-red-700" : "text-base text-green-700 hover:text-green-600"}`}
+                disabled={isLoading}
+                onClick={handleAuthAction}
+                type="button"
+              >
+                {isAuthenticated ? (
+                  <>
+                    <span aria-hidden>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                        <path d="M16 17l5-5-5-5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                        <path d="M21 12H9" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                      </svg>
+                    </span>
+                    <span>Sair</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Entrar</span>
+                    <span>→</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -95,7 +146,7 @@ export function Navbar() {
           </div>
 
           <nav className="space-y-2 p-4 text-sm">
-            <Link className="block rounded-lg border px-3 py-2 text-blue-900 hover:bg-blue-50" href="/" onClick={() => setOpen(false)}>
+            <Link className="block rounded-lg border px-3 py-2 text-blue-900 hover:bg-blue-50" href={isAuthenticated ? dashboardHref : "/"} onClick={() => setOpen(false)}>
               Início
             </Link>
 

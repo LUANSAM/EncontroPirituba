@@ -102,7 +102,7 @@ export default async function HomePage() {
         <Container>
           <section className="rounded-lg border bg-white p-4 shadow">
             <h2 className="whitespace-nowrap text-[clamp(1.05rem,4.2vw,1.85rem)] font-bold leading-tight text-blue-900">
-              Marketplace local, elegante e prático
+              Marketplace local e prático
             </h2>
             <p className="mt-2 text-justify text-[clamp(0.84rem,2.7vw,1.08rem)] leading-relaxed text-graytext">
               O Encontro Pirituba é um ecossistema digital exclusivo projetado para fortalecer a economia regional, conectando moradores a uma rede selecionada de profissionais e estabelecimentos sediados estritamente na Subprefeitura de Pirituba. Nossa missão é transformar a dinâmica de consumo local através de uma plataforma de confiança, onde usuários acessam serviços qualificados e benefícios exclusivos via vouchers, enquanto profissionais e empresas locais utilizam ferramentas estratégicas de visibilidade e gestão de reputação para impulsionar seus negócios.

@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/atoms/Container";
 import { supabase } from "@/lib/supabase/client";
+import { validarCep, normalizarCep } from "@/lib/validarCep";
 
 type PublicRole = "cliente" | "profissional" | "estabelecimento";
 
@@ -12,16 +13,6 @@ const roleCards: Array<{ value: PublicRole; label: string; description: string }
   { value: "profissional", label: "Profissional", description: "Divulgue serviços para moradores da região." },
   { value: "estabelecimento", label: "Estabelecimento", description: "Promova ofertas e vouchers para o bairro." },
 ];
-
-const allowedNeighborhoods = ["pirituba", "jaragua", "sao domingos"];
-
-function normalizeText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
 
 function sanitizeCep(rawCep: string) {
   return rawCep.replace(/\D/g, "").slice(0, 8);
@@ -47,6 +38,15 @@ interface SignUpFormState {
   site: string;
 }
 
+interface ValidatedAddressState {
+  cep: string;
+  logradouro: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+}
+
 const initialSignUpState: SignUpFormState = {
   fullName: "",
   email: "",
@@ -61,46 +61,6 @@ const initialSignUpState: SignUpFormState = {
   site: "",
 };
 
-async function validatePiritubaCep(cep: string) {
-  const cleanedCep = sanitizeCep(cep);
-  if (cleanedCep.length !== 8) {
-    return {
-      valid: false,
-      message: "Informe um CEP válido com 8 dígitos.",
-    };
-  }
-
-  const response = await fetch(`https://viacep.com.br/ws/${cleanedCep}/json/`);
-  const data = await response.json();
-
-  if (!response.ok || data?.erro) {
-    return {
-      valid: false,
-      message: "CEP não encontrado. Verifique e tente novamente.",
-    };
-  }
-
-  const neighborhood = normalizeText(data?.bairro ?? "");
-  const city = normalizeText(data?.localidade ?? "");
-  const inPiritubaArea = city === "sao paulo" && allowedNeighborhoods.some((item) => neighborhood.includes(item));
-
-  if (!inPiritubaArea) {
-    return {
-      valid: false,
-      message: "Entrada Negada: serviço disponível apenas para a região de Pirituba",
-    };
-  }
-
-  return {
-    valid: true,
-    message: "CEP validado com sucesso para Pirituba/Jaraguá/São Domingos.",
-    address: {
-      logradouro: data?.logradouro ?? "",
-      complemento: data?.complemento ?? "",
-    },
-  };
-}
-
 export function AuthPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"login" | "cadastro">("login");
@@ -112,7 +72,11 @@ export function AuthPage() {
   const [loginPassword, setLoginPassword] = useState("");
 
   const [signUp, setSignUp] = useState<SignUpFormState>(initialSignUpState);
+  const [validatedAddress, setValidatedAddress] = useState<ValidatedAddressState | null>(null);
   const [cepValidated, setCepValidated] = useState(false);
+  const [showDistritos, setShowDistritos] = useState(false);
+  const [distritosList, setDistritosList] = useState<string[]>([]);
+  const [distritosLoading, setDistritosLoading] = useState(false);
 
   const needsCepValidation = signUp.role === "profissional" || signUp.role === "estabelecimento";
 
@@ -121,7 +85,6 @@ export function AuthPage() {
     if (!needsCepValidation) return true;
     if (!signUp.cep || !cepValidated) return false;
     if (!signUp.logradouro || !signUp.numero || !signUp.whatsapp) return false;
-    if (signUp.role !== "cliente" && (!signUp.instagram || !signUp.site)) return false;
     return true;
   }, [signUp, needsCepValidation, cepValidated]);
 
@@ -171,11 +134,27 @@ export function AuthPage() {
       return;
     }
 
-    const { data: profileData } = await supabase.from("usuarios").select("role").eq("user_id", userId).maybeSingle();
-    const role = profileData?.role;
+    const loginEmailNormalized = data.user?.email || loginEmail;
+    const { data: usuariosData } = await supabase
+      .from("usuarios")
+      .select("role")
+      .eq("email", loginEmailNormalized)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const role = usuariosData?.[0]?.role;
 
-    if (role === "profissional" || role === "estabelecimento") {
-      router.push("/dashboard");
+    if (role === "profissional") {
+      router.push("/dashboard/profissional");
+      return;
+    }
+
+    if (role === "estabelecimento") {
+      router.push("/dashboard/estabelecimento");
+      return;
+    }
+
+    if (role === "cliente") {
+      router.push("/dashboard/cliente");
       return;
     }
 
@@ -188,56 +167,96 @@ export function AuthPage() {
 
     if (!needsCepValidation) {
       setCepValidated(true);
+      setValidatedAddress(null);
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await validatePiritubaCep(signUp.cep);
-      if (!result.valid) {
+      const resultado = await validarCep(signUp.cep);
+      
+      if (!resultado.valido) {
         setCepValidated(false);
-        setError(result.message);
+        setError(resultado.mensagem);
+        return;
+      }
+
+      if (!resultado.autorizado) {
+        setCepValidated(false);
+        setError(resultado.mensagem);
         return;
       }
 
       setCepValidated(true);
-      setFeedback(result.message);
-
-      if (result.address) {
-        setSignUp((prev) => ({
-          ...prev,
-          logradouro: prev.logradouro || result.address.logradouro,
-          complemento: prev.complemento || result.address.complemento,
-        }));
-      }
-    } catch {
+      setFeedback(resultado.mensagem);
+      setValidatedAddress({
+        cep: sanitizeCep(resultado.cep || signUp.cep),
+        logradouro: resultado.logradouro || "",
+        complemento: resultado.complemento || "",
+        bairro: resultado.bairro || "",
+        cidade: resultado.cidade || "",
+        uf: resultado.uf || "",
+      });
+      setSignUp((prev) => ({
+        ...prev,
+        logradouro: prev.logradouro || resultado.logradouro || "",
+        complemento: prev.complemento || resultado.complemento || "",
+      }));
+    } catch (err) {
       setCepValidated(false);
+      setValidatedAddress(null);
       setError("Não foi possível validar o CEP agora. Tente novamente em instantes.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (!showDistritos) return;
+    let mounted = true;
+    (async () => {
+      setDistritosLoading(true);
+      const { data, error } = await supabase.from("distritos").select("distrito").eq("autorizado", true).order("distrito", { ascending: true });
+      if (!mounted) return;
+      if (error) {
+        setDistritosList([]);
+      } else {
+        setDistritosList((data || []).map((d: any) => d.distrito));
+      }
+      setDistritosLoading(false);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [showDistritos]);
+
   const insertUserProfile = async (userId: string) => {
+    const endereco = {
+      cep: sanitizeCep(signUp.cep) || validatedAddress?.cep || "",
+      logradouro: signUp.logradouro || validatedAddress?.logradouro || "",
+      numero: signUp.numero || "",
+      complemento: signUp.complemento || validatedAddress?.complemento || "",
+      bairro: validatedAddress?.bairro || "",
+      cidade: validatedAddress?.cidade || "",
+      uf: validatedAddress?.uf || "",
+    };
+
+    const contato = {
+      whatsapp: signUp.whatsapp || "",
+      instagram: signUp.role === "cliente" ? "" : signUp.instagram || "",
+      site: signUp.role === "cliente" ? "" : signUp.site || "",
+    };
+
     const payload = {
-      user_id: userId,
       nome: signUp.fullName,
       email: signUp.email,
       role: signUp.role,
-      cep: sanitizeCep(signUp.cep) || null,
-      logradouro: signUp.logradouro || null,
-      numero: signUp.numero || null,
-      complemento: signUp.complemento || null,
-      whatsapp: signUp.whatsapp || null,
-      instagram: signUp.role === "cliente" ? null : signUp.instagram || null,
-      site: signUp.role === "cliente" ? null : signUp.site || null,
+      endereco,
+      contato,
     };
 
     const tryUsuarios = await supabase.from("usuarios").insert(payload);
     if (!tryUsuarios.error) return;
-
-    const tryUsuario = await supabase.from("usuario").insert(payload);
-    if (!tryUsuario.error) return;
 
     await supabase.from("profiles").insert({
       user_id: userId,
@@ -272,33 +291,98 @@ export function AuthPage() {
     });
 
     if (signUpError) {
+      const normalizedMessage = (signUpError.message || "").toLowerCase();
+      const isEmailRateLimitError =
+        normalizedMessage.includes("email rate limit") ||
+        (normalizedMessage.includes("rate limit") && normalizedMessage.includes("email"));
+
+      if (isEmailRateLimitError) {
+        const { data: signInFallbackData, error: signInFallbackError } = await supabase.auth.signInWithPassword({
+          email: signUp.email,
+          password: signUp.password,
+        });
+
+        if (!signInFallbackError && signInFallbackData.user) {
+          setIsLoading(false);
+          setFeedback("Conta já criada anteriormente. Você foi autenticado com sucesso.");
+
+          if (signUp.role === "cliente") {
+            router.push("/dashboard/cliente");
+            return;
+          }
+
+          router.push("/onboarding/configuracoes-iniciais");
+          return;
+        }
+
+        setIsLoading(false);
+        setError("Muitas tentativas em pouco tempo. Aguarde alguns segundos e tente novamente, ou faça login se sua conta já foi criada.");
+        setActiveTab("login");
+        setLoginEmail(signUp.email);
+        setLoginPassword("");
+        return;
+      }
+
       setIsLoading(false);
       setError(signUpError.message);
       return;
     }
 
-    const userId = data.user?.id;
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(
+        "pendingSignUpAuth",
+        JSON.stringify({
+          email: signUp.email,
+          password: signUp.password,
+          createdAt: Date.now(),
+        })
+      );
+    }
+
+    let authenticatedUser = data.user;
+
+    if (!data.session) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: signUp.email,
+        password: signUp.password,
+      });
+
+      if (!signInError && signInData.user) {
+        authenticatedUser = signInData.user;
+      } else {
+        setFeedback("Conta criada com sucesso. Estamos finalizando sua autenticação.");
+      }
+    }
+
+    const userId = authenticatedUser?.id;
 
     if (userId) {
       await insertUserProfile(userId);
+    } else {
+      setIsLoading(false);
+      setError("Não foi possível confirmar sua autenticação. Faça login para continuar.");
+      setActiveTab("login");
+      setLoginEmail(signUp.email);
+      return;
     }
 
     setIsLoading(false);
 
     if (signUp.role === "cliente") {
-      router.push("/onboarding/dados-iniciais");
+      router.push("/dashboard/cliente");
       return;
     }
 
-    router.push("/onboarding/recepcao");
+    router.push("/onboarding/configuracoes-iniciais");
   };
 
   return (
-    <main className="py-6">
-      <Container>
-        <div className="mx-auto w-full max-w-xl rounded-xl border bg-white p-4 shadow sm:p-6">
-          <h1 className="text-center text-2xl font-bold text-blue-900">Acessar conta</h1>
-          <p className="mt-1 text-center text-sm text-graytext">Login e cadastro para clientes, profissionais e estabelecimentos.</p>
+    <>
+      <main className="py-6">
+        <Container>
+          <div className="mx-auto w-full max-w-xl rounded-xl border bg-white p-4 shadow sm:p-6">
+            <h1 className="text-center text-2xl font-bold text-blue-900">Acessar conta</h1>
+            <p className="mt-1 text-center text-sm text-graytext">Login e cadastro para clientes, profissionais e estabelecimentos.</p>
 
           <div className="mt-4 grid grid-cols-2 rounded-lg bg-blue-50 p-1">
             <button
@@ -370,6 +454,7 @@ export function AuthPage() {
                     onClick={() => {
                       setSignUp((prev) => ({ ...prev, role: roleCard.value }));
                       setCepValidated(false);
+                      setValidatedAddress(null);
                       setError("");
                       setFeedback("");
                     }}
@@ -411,6 +496,7 @@ export function AuthPage() {
                 onChange={(event) => {
                   setSignUp((prev) => ({ ...prev, cep: sanitizeCep(event.target.value) }));
                   setCepValidated(false);
+                  setValidatedAddress(null);
                 }}
                 placeholder={needsCepValidation ? "CEP (obrigatório)" : "CEP (opcional)"}
                 required={needsCepValidation}
@@ -471,7 +557,6 @@ export function AuthPage() {
                       className="w-full bg-transparent outline-none"
                       onChange={(event) => setSignUp((prev) => ({ ...prev, instagram: event.target.value }))}
                       placeholder="Instagram"
-                      required
                       value={signUp.instagram}
                     />
                   </label>
@@ -482,7 +567,6 @@ export function AuthPage() {
                       className="w-full bg-transparent outline-none"
                       onChange={(event) => setSignUp((prev) => ({ ...prev, site: event.target.value }))}
                       placeholder="Site"
-                      required
                       value={signUp.site}
                     />
                   </label>
@@ -498,12 +582,51 @@ export function AuthPage() {
               </button>
 
               <p className="text-center text-xs text-graytext">
-                Profissionais e estabelecimentos fora de Pirituba recebem recusa automática conforme regra de negócio.
+                Profissionais e estabelecimentos precisam estar em distritos autorizados pela plataforma. Verifique se seu bairro está na <button
+                  type="button"
+                  onClick={() => setShowDistritos(true)}
+                  className="inline font-bold text-blue-900 underline"
+                >
+                  lista
+                </button>{" "}antes de se cadastrar.
               </p>
             </form>
           )}
         </div>
       </Container>
     </main>
+
+    {showDistritos && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50" onClick={() => setShowDistritos(false)} />
+        <div className="relative z-10 mx-4 max-w-lg rounded-lg bg-white p-6 shadow-lg">
+          <div className="flex items-start justify-between">
+            <h3 className="text-lg font-semibold text-blue-900">Bairros / Distritos Autorizados</h3>
+            <button 
+              className="text-gray-500 hover:text-gray-700 text-2xl leading-none" 
+              onClick={() => setShowDistritos(false)} 
+              type="button"
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+          </div>
+          <div className="mt-4 max-h-64 overflow-auto">
+            {distritosLoading ? (
+              <p className="text-sm text-graytext">Carregando...</p>
+            ) : distritosList.length === 0 ? (
+              <p className="text-sm text-graytext">Nenhum bairro autorizado encontrado.</p>
+            ) : (
+              <ul className="space-y-2">
+                {distritosList.map((d) => (
+                  <li key={d} className="rounded border px-3 py-2 text-sm">{d}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
