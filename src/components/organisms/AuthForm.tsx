@@ -19,7 +19,6 @@ export function AuthForm() {
   const queryClient = useQueryClient();
 
   const onSubmit = async (data: AuthFormData) => {
-    console.log("[AuthForm] Iniciando login com email:", data.email);
     setLoading(true);
     setError("");
 
@@ -29,28 +28,20 @@ export function AuthForm() {
         password: data.password,
       });
 
-      console.log("[AuthForm] Resposta do Supabase:", { authData, authError });
-
       if (authError) {
-        console.error("[AuthForm] Erro ao fazer login:", authError);
         setError(authError.message);
         setLoading(false);
         return;
       }
 
       if (!authData.session) {
-        console.error("[AuthForm] Login bem-sucedido mas sem sessão");
         setError("Login realizado mas sessão não foi criada.");
         setLoading(false);
         return;
       }
 
-      console.log("[AuthForm] Login bem-sucedido! User ID:", authData.user?.id);
-      console.log("[AuthForm] Session criada:", authData.session);
-
       // Invalidar cache do React Query para forçar recarregar sessão
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
-      console.log("[AuthForm] Cache do React Query invalidado");
 
       // Aguardar um pouco para garantir que a sessão foi persistida
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -63,27 +54,21 @@ export function AuthForm() {
         .order("created_at", { ascending: false })
         .limit(1);
 
-      console.log("[AuthForm] Verificação de perfil:", { usuarioData, usuarioError });
-
       if (usuarioError || !usuarioData || usuarioData.length === 0) {
-        console.log("[AuthForm] Perfil não encontrado, redirecionando para onboarding");
         router.push("/onboarding/recepcao");
       } else {
         const role = usuarioData[0].role;
-        console.log("[AuthForm] Perfil encontrado com role:", role);
         
         const dashboardPath = 
           role === "profissional" ? "/dashboard/profissional" :
           role === "estabelecimento" ? "/dashboard/estabelecimento" :
           "/dashboard/cliente";
         
-        console.log("[AuthForm] Redirecionando para:", dashboardPath);
         router.push(dashboardPath);
       }
 
       router.refresh();
-    } catch (err) {
-      console.error("[AuthForm] Erro inesperado:", err);
+    } catch {
       setError("Erro ao fazer login. Tente novamente.");
     } finally {
       setLoading(false);

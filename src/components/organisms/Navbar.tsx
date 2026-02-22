@@ -18,16 +18,7 @@ export function Navbar() {
   const { data: session, isLoading } = useAuth();
 
   const isAuthenticated = Boolean(session?.user?.id);
-  
-  console.log("[Navbar] Render:", {
-    isAuthenticated,
-    isLoading,
-    userId: session?.user?.id || "none",
-    email: session?.user?.email || "none",
-    userRole,
-    pathname
-  });
-  
+
   const metadataName =
     session?.user?.user_metadata?.name || session?.user?.user_metadata?.full_name || session?.user?.user_metadata?.first_name;
   const emailName = session?.user?.email?.split("@")[0];
@@ -39,12 +30,9 @@ export function Navbar() {
     let mounted = true;
 
     if (!session?.user?.email) {
-      console.log("[Navbar] useEffect: sem sessão ou email, limpando userRole");
       setUserRole(null);
       return;
     }
-
-    console.log("[Navbar] useEffect: buscando role para", session.user.email);
 
     (async () => {
       const { data } = await supabase
@@ -57,7 +45,6 @@ export function Navbar() {
       if (!mounted) return;
       
       const role = data?.[0]?.role || null;
-      console.log("[Navbar] useEffect: role encontrado:", role);
       setUserRole(role);
     })();
 
@@ -81,19 +68,14 @@ export function Navbar() {
         : "/dashboard/cliente";
 
   const handleAuthAction = async () => {
-    console.log("[Navbar] handleAuthAction chamado, isAuthenticated:", isAuthenticated);
-    
     if (isAuthenticated) {
-      console.log("[Navbar] Fazendo logout");
       await supabase.auth.signOut();
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
       setOpen(false);
-      console.log("[Navbar] Logout concluído, refreshing router");
       router.refresh();
       return;
     }
 
-    console.log("[Navbar] Redirecionando para /auth");
     setOpen(false);
     router.push("/auth");
   };
