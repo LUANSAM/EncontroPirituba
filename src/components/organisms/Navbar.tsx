@@ -158,9 +158,11 @@ export function Navbar() {
                 <button className="block w-full rounded-lg border px-3 py-2 text-left text-blue-900 hover:bg-blue-50" type="button">
                   Avaliações
                 </button>
-                <button className="block w-full rounded-lg border px-3 py-2 text-left text-blue-900 hover:bg-blue-50" type="button">
-                  Cupons
-                </button>
+                {userRole !== "profissional" && (
+                  <button className="block w-full rounded-lg border px-3 py-2 text-left text-blue-900 hover:bg-blue-50" type="button">
+                    Cupons
+                  </button>
+                )}
                 <button className="block w-full rounded-lg border px-3 py-2 text-left text-blue-900 hover:bg-blue-50" type="button">
                   Favoritos
                 </button>
