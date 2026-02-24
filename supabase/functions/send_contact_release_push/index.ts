@@ -31,6 +31,26 @@ function buildBody(requesterName?: string, requesterEmail?: string, requestNote?
   return `${requester} solicitou liberação de contato.`;
 }
 
+function normalizeSecret(value: string) {
+  return String(value || "").trim().replace(/^"|"$/g, "");
+}
+
+function isLikelyBase64Url(value: string) {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
+function normalizeVapidSubject(value: string) {
+  const subject = String(value || "").trim().replace(/^"|"$/g, "");
+  if (!subject) return "mailto:contato@encontropirituba.com.br";
+  if (subject.startsWith("mailto:") || subject.startsWith("http://") || subject.startsWith("https://")) {
+    return subject;
+  }
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subject)) {
+    return `mailto:${subject}`;
+  }
+  return subject;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -44,11 +64,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!vapidPublicKey || !vapidPrivateKey) {
+    const normalizedVapidPublicKey = normalizeSecret(vapidPublicKey);
+    const normalizedVapidPrivateKey = normalizeSecret(vapidPrivateKey);
+    const normalizedVapidSubject = normalizeVapidSubject(vapidSubject);
+
+    if (!normalizedVapidPublicKey || !normalizedVapidPrivateKey) {
       return new Response(JSON.stringify({ error: "Missing WEB_PUSH_VAPID_PUBLIC_KEY/PRIVATE_KEY." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (!isLikelyBase64Url(normalizedVapidPublicKey) || !isLikelyBase64Url(normalizedVapidPrivateKey)) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid WEB_PUSH_VAPID_PUBLIC_KEY/PRIVATE_KEY format.",
+          hint: "Use base64url VAPID keys without spaces, quotes or line breaks.",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -143,7 +180,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+    try {
+      webpush.setVapidDetails(normalizedVapidSubject, normalizedVapidPublicKey, normalizedVapidPrivateKey);
+    } catch (vapidError) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid WEB_PUSH_VAPID configuration.",
+          details: (vapidError as Error)?.message || null,
+          hint: "Use WEB_PUSH_VAPID_SUBJECT as mailto:email@dominio.com or https://seu-dominio.com",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     const payload = JSON.stringify({
       title: "Nova solicitação de contato",
