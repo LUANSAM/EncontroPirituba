@@ -31,6 +31,10 @@ export function Navbar() {
 
     if (!session?.user?.email) {
       setUserRole(null);
+      if (typeof document !== "undefined") {
+        document.cookie = "ep_auth=; path=/; max-age=0; samesite=lax";
+        document.cookie = "ep_role=; path=/; max-age=0; samesite=lax";
+      }
       return;
     }
 
@@ -46,6 +50,11 @@ export function Navbar() {
       
       const role = data?.[0]?.role || null;
       setUserRole(role);
+
+      if (typeof document !== "undefined" && role) {
+        document.cookie = `ep_auth=1; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+        document.cookie = `ep_role=${role}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+      }
     })();
 
     return () => {
@@ -69,10 +78,40 @@ export function Navbar() {
 
   const handleAuthAction = async () => {
     if (isAuthenticated) {
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.clear();
+          window.sessionStorage.clear();
+        }
+
+        if (typeof document !== "undefined") {
+          document.cookie = "ep_auth=; path=/; max-age=0; samesite=lax";
+          document.cookie = "ep_role=; path=/; max-age=0; samesite=lax";
+        }
+
+        if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+          const registration = await navigator.serviceWorker.getRegistration("/");
+          if (registration) {
+            const subscription = await registration.pushManager.getSubscription();
+            if (subscription) {
+              await supabase.rpc("deactivate_browser_push_subscription", { p_endpoint: subscription.endpoint });
+              await subscription.unsubscribe();
+            }
+          }
+        }
+
+        if (typeof caches !== "undefined") {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+        }
+      } catch {
+      }
+
       await supabase.auth.signOut();
+      queryClient.clear();
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
       setOpen(false);
-      router.refresh();
+      router.replace("/auth");
       return;
     }
 

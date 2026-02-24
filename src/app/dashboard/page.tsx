@@ -17,7 +17,7 @@ export default function DashboardPage() {
       } = await supabase.auth.getUser();
 
       if (!mounted || !user?.email) {
-        router.replace("/auth");
+        router.replace("/");
         return;
       }
 
@@ -40,7 +40,12 @@ export default function DashboardPage() {
         return;
       }
 
-      router.replace("/dashboard/cliente");
+      if (role === "cliente") {
+        router.replace("/dashboard/cliente");
+        return;
+      }
+
+      router.replace("/");
     })();
 
     return () => {

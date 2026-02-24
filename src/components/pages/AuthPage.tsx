@@ -79,11 +79,19 @@ export function AuthPage() {
   const [distritosLoading, setDistritosLoading] = useState(false);
 
   const needsCepValidation = signUp.role === "profissional" || signUp.role === "estabelecimento";
+  const isClientSignUp = signUp.role === "cliente";
+
+  const persistAuthCookies = (role: PublicRole) => {
+    if (typeof document === "undefined") return;
+    document.cookie = `ep_auth=1; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+    document.cookie = `ep_role=${role}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+  };
 
   const canSubmitSignUp = useMemo(() => {
     if (!signUp.fullName || !signUp.email || !signUp.password) return false;
+    if (!signUp.cep || !signUp.whatsapp) return false;
     if (!needsCepValidation) return true;
-    if (!signUp.cep || !cepValidated) return false;
+    if (!cepValidated) return false;
     if (!signUp.logradouro || !signUp.numero || !signUp.whatsapp) return false;
     return true;
   }, [signUp, needsCepValidation, cepValidated]);
@@ -144,16 +152,19 @@ export function AuthPage() {
     const role = usuariosData?.[0]?.role;
 
     if (role === "profissional") {
+      persistAuthCookies("profissional");
       router.push("/dashboard/profissional");
       return;
     }
 
     if (role === "estabelecimento") {
+      persistAuthCookies("estabelecimento");
       router.push("/dashboard/estabelecimento");
       return;
     }
 
     if (role === "cliente") {
+      persistAuthCookies("cliente");
       router.push("/dashboard/cliente");
       return;
     }
@@ -251,8 +262,17 @@ export function AuthPage() {
       nome: signUp.fullName,
       email: signUp.email,
       role: signUp.role,
+      plano: signUp.role === "cliente" ? "cliente" : null,
       endereco,
       contato,
+      autorizado: signUp.role === "cliente" ? true : false,
+      indicadores:
+        signUp.role === "cliente"
+          ? {
+              nAvaliacao: 0,
+              nPreco: 0,
+            }
+          : {},
     };
 
     const tryUsuarios = await supabase.from("usuarios").insert(payload);
@@ -307,9 +327,12 @@ export function AuthPage() {
           setFeedback("Conta já criada anteriormente. Você foi autenticado com sucesso.");
 
           if (signUp.role === "cliente") {
+            persistAuthCookies("cliente");
             router.push("/dashboard/cliente");
             return;
           }
+
+          persistAuthCookies(signUp.role);
 
           router.push("/onboarding/configuracoes-iniciais");
           return;
@@ -369,9 +392,12 @@ export function AuthPage() {
     setIsLoading(false);
 
     if (signUp.role === "cliente") {
+      persistAuthCookies("cliente");
       router.push("/dashboard/cliente");
       return;
     }
+
+    persistAuthCookies(signUp.role);
 
     router.push("/onboarding/configuracoes-iniciais");
   };
@@ -498,10 +524,23 @@ export function AuthPage() {
                   setCepValidated(false);
                   setValidatedAddress(null);
                 }}
-                placeholder={needsCepValidation ? "CEP (obrigatório)" : "CEP (opcional)"}
-                required={needsCepValidation}
+                placeholder="CEP (obrigatório)"
+                required
                 value={signUp.cep}
               />
+
+              {isClientSignUp && (
+                <label className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2">
+                  <span aria-hidden>📱</span>
+                  <input
+                    className="w-full bg-transparent outline-none"
+                    onChange={(event) => setSignUp((prev) => ({ ...prev, whatsapp: event.target.value }))}
+                    placeholder="WhatsApp (obrigatório)"
+                    required
+                    value={signUp.whatsapp}
+                  />
+                </label>
+              )}
 
               {needsCepValidation && (
                 <button

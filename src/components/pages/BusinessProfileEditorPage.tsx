@@ -162,7 +162,7 @@ export function BusinessProfileEditorPage({ role }: Props) {
       if (!mounted) return;
 
       if (!user?.email) {
-        router.replace("/auth");
+        router.replace("/");
         return;
       }
 
@@ -179,8 +179,7 @@ export function BusinessProfileEditorPage({ role }: Props) {
       if (!mounted) return;
 
       if (loadError || !data || data.length === 0) {
-        setError("Não foi possível carregar os dados do perfil.");
-        setIsBootLoading(false);
+        router.replace("/");
         return;
       }
 

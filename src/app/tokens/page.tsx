@@ -27,7 +27,7 @@ const PLANS: Plan[] = [
     tokens: 25,
     rsPerCoin: "1,00",
     benefits: [],
-    taxes: "Cliente solicita contato: 3 moedas\nProfissional escolhe serviço: 5 moedas",
+    taxes: "Cliente solicita contato: 2 moedas\nProfissional escolhe serviço: 5 moedas",
     tone: "bg-slate-50 border-slate-300",
     accent: "text-slate-800",
   },
@@ -38,7 +38,7 @@ const PLANS: Plan[] = [
     tokens: 75,
     rsPerCoin: "0,80",
     benefits: [],
-    taxes: "Cliente solicita contato: 3 moedas\nProfissional escolhe serviço: 5 moedas",
+    taxes: "Cliente solicita contato: 2 moedas\nProfissional escolhe serviço: 5 moedas",
     tone: "bg-blue-50 border-blue-300",
     accent: "text-blue-900",
   },
@@ -106,7 +106,7 @@ export default function TokensPage() {
       if (!mounted) return;
 
       if (!user?.email) {
-        router.replace("/auth");
+        router.replace("/");
         return;
       }
 
@@ -120,8 +120,7 @@ export default function TokensPage() {
       if (!mounted) return;
 
       if (loadError || !data || data.length === 0) {
-        setError("Não foi possível carregar seu perfil para compra de tokens.");
-        setIsBootLoading(false);
+        router.replace("/");
         return;
       }
 
@@ -133,7 +132,7 @@ export default function TokensPage() {
       setIsBootLoading(false);
 
       if (userRole !== "profissional" && userRole !== "estabelecimento") {
-        router.replace(dashboardPathByRole(userRole));
+        router.replace("/");
       }
     })();
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/atoms/Container";
+import { ProfessionalContactReleaseTabs } from "@/components/organisms/ProfessionalContactReleaseTabs";
 import { supabase } from "@/lib/supabase/client";
 
 type IndicadoresMap = Record<string, unknown>;
@@ -223,7 +224,7 @@ export default function DashboardProfissionalPage() {
       if (!mounted) return;
 
       if (!user?.email) {
-        router.replace("/auth");
+        router.replace("/");
         return;
       }
 
@@ -238,8 +239,7 @@ export default function DashboardProfissionalPage() {
       if (!mounted) return;
 
       if (queryError || !data || data.length === 0) {
-        setError("Não foi possível carregar os indicadores do profissional.");
-        setIsLoading(false);
+        router.replace("/");
         return;
       }
 
@@ -445,6 +445,8 @@ export default function DashboardProfissionalPage() {
                     </div>
                   </section>
                 )}
+
+                <ProfessionalContactReleaseTabs />
               </>
             )}
 
